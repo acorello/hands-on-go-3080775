@@ -3,8 +3,16 @@ package main
 
 import "unicode"
 
-type letterCounter struct{ identifier string }
+type counter interface {
+	name() string
+	count(input string) int
+}
 
+type letterCounter uint
+
+func (n letterCounter) name() string {
+	return "letters"
+}
 func (l letterCounter) count(input string) int {
 	result := 0
 	for _, char := range input {
@@ -15,10 +23,10 @@ func (l letterCounter) count(input string) int {
 	return result
 }
 
-type numberCounter struct{ designation string }
+type numberCounter uint
 
 func (n numberCounter) name() string {
-	return n.designation
+	return "numbers"
 }
 
 func (n numberCounter) count(input string) int {
@@ -31,16 +39,16 @@ func (n numberCounter) count(input string) int {
 	return result
 }
 
-type symbolCounter struct{ label string }
+type symbolCounter uint
 
 func (s symbolCounter) name() string {
-	return s.label
+	return "symbols"
 }
 
 func (s symbolCounter) count(input string) int {
 	result := 0
 	for _, char := range input {
-		if !unicode.IsLetter(char) && !unicode.IsNumber(char) {
+		if  unicode.IsSymbol(char) || unicode.IsPunct(char)  {
 			result++
 		}
 	}

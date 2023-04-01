@@ -1,0 +1,2 @@
+word after 1 %
+then sym 3 !

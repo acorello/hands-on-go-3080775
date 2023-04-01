@@ -15,6 +15,13 @@ func sum[T numeric](numbers ...T) T {
 	return s
 }
 
+func sumInt(numbers ...int) (res int) {
+	for _, n := range numbers {
+		res += n
+	}
+	return
+}
+
 func sumAny(numbers []interface{}) interface{} {
 	var result float64
 	for _, n := range numbers {

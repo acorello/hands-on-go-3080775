@@ -2,121 +2,142 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"math/rand"
+	"io"
+	"log"
 	"os"
-	"strings"
-	"time"
+	"sync"
 	"unicode"
-
-	"github.com/davecgh/go-spew/spew"
 )
-
-var random *rand.Rand
-
-func init() {
-	random = rand.New(rand.NewSource(time.Now().UnixNano()))
-}
 
 type counter interface {
 	name() string
-	count(input string) int
+	count(input string)
+	value() uint
 }
 
-type letterCounter struct{ identifier string }
+type letterCounter uint
+
+func (l letterCounter) value() uint {
+	return uint(l)
+}
 
 func (l letterCounter) name() string {
-	return l.identifier
+	return "letters"
 }
 
-func (l letterCounter) count(input string) int {
-	result := 0
-	fmt.Println(l.name(), "working...")
-	time.Sleep(time.Duration(random.Intn(5)) * time.Second)
+func (l *letterCounter) count(input string) {
 	for _, char := range input {
 		if unicode.IsLetter(char) {
-			result++
+			(*l)++
 		}
 	}
-	return result
 }
 
-type numberCounter struct{ designation string }
+type numberCounter uint
+
+func (n numberCounter) value() uint {
+	return uint(n)
+}
 
 func (n numberCounter) name() string {
-	return n.designation
+	return "numbers"
 }
 
-func (n numberCounter) count(input string) int {
-	result := 0
-	fmt.Println(n.name(), "working...")
-	time.Sleep(time.Duration(random.Intn(5)) * time.Second)
+func (n *numberCounter) count(input string) {
 	for _, char := range input {
 		if unicode.IsNumber(char) {
-			result++
+			(*n)++
 		}
 	}
-	return result
 }
 
-type symbolCounter struct{ label string }
+type symbolCounter uint
+
+func (s symbolCounter) value() uint {
+	return uint(s)
+}
 
 func (s symbolCounter) name() string {
-	return s.label
+	return "symbols"
 }
 
-func (s symbolCounter) count(input string) int {
-	result := 0
-	fmt.Println(s.name(), "working...")
-	time.Sleep(time.Duration(random.Intn(5)) * time.Second)
+func (s *symbolCounter) count(input string) {
 	for _, char := range input {
 		if !unicode.IsLetter(char) && !unicode.IsNumber(char) {
-			result++
+			(*s)++
 		}
 	}
-	return result
 }
 
-func doAnalysis(data string, counters ...counter) map[string]int {
-	// initialize a map to store the counts
-	analysis := make(map[string]int)
+type callCounter uint
 
-	// capture the length of the words in the data
-	analysis["words"] = len(strings.Fields(data))
+func (s callCounter) value() uint {
+	return uint(s)
+}
 
-	// loop over the counters and use their name as the key
-	for _, c := range counters {
-		analysis[c.name()] = c.count(data)
-	}
+func (s callCounter) name() string {
+	return "words"
+}
 
-	// return the map
-	return analysis
+func (s *callCounter) count(input string) {
+	(*s)++
 }
 
 func main() {
-	// handle any panics that might occur anywhere in this function
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Println("Error:", r)
-		}
-	}()
-
-	// use os package to read the file specified as a command line argument
-	bs, err := os.ReadFile(os.Args[1])
+	fileBody, err := os.Open(os.Args[1])
 	if err != nil {
-		panic(fmt.Errorf("failed to read file: %s", err))
+		log.Fatalf("failed to read file: %s", err)
+	}
+	defer fileBody.Close()
+	analists := analysts()
+	doAnalisys(fileBody, analists...)
+	for _, analist := range analists {
+		fmt.Printf("%s: %d\n", analist.name(), analist.value())
+	}
+}
+
+func analysts() []counter {
+	var (
+		l = letterCounter(0)
+		n = numberCounter(0)
+		s = symbolCounter(0)
+		c = callCounter(0)
+	)
+	var analists = []counter{&l, &n, &s, &c}
+	return analists
+}
+
+func doAnalisys(dataReader io.Reader, analists ...counter) {
+	scanner := bufio.NewScanner(dataReader)
+	scanner.Split(bufio.ScanWords)
+	// one-channel and go-routine per analist
+	channels := make([]chan string, 0)
+	wg := sync.WaitGroup{}
+	for _, analyst := range analists {
+		wg.Add(1)
+		ch := make(chan string)
+		channels = append(channels, ch)
+		go func(analyst counter) {
+			for word := range ch {
+				analyst.count(word)
+			}
+			wg.Done()
+		}(analyst)
 	}
 
-	// convert the bytes to a string
-	data := string(bs)
-
-	// call doAnalysis and pass in the data and the counters
-	analysis := doAnalysis(data,
-		letterCounter{identifier: "letters"},
-		numberCounter{designation: "numbers"},
-		symbolCounter{label: "symbols"},
-	)
-
-	// dump the map to the console using the spew package
-	spew.Dump(analysis)
+	for scanner.Scan() {
+		word := scanner.Text()
+		for _, channel := range channels {
+			channel <- word
+		}
+	}
+	for _, channel := range channels {
+		close(channel)
+	}
+	wg.Wait()
+	if err := scanner.Err(); err != nil {
+		log.Fatalf("failed to read file: %s", err)
+	}
 }

@@ -4,18 +4,14 @@ import "fmt"
 
 type author struct {
 	name string
+	surn string
 }
 
 func main() {
-	// declare a map of string keys and author values
-	var authors map[string]author
-
-	// initialize the map with make
-	authors = make(map[string]author)
-
-	// add authors to the map
-	authors["tm"] = author{name: "Toni Morrison"}
-	authors["ma"] = author{name: "Marcus Aurelius"}
+	authors := map[string]struct{ name, surn string }{
+		"tm": {name: "Toni", surn: "Morrison"},
+		"ma": {name: "Marcus", surn: "Aurelius"},
+	}
 
 	// alternative syntax to declare and initialize the author map
 	// authors := map[string]author{
@@ -27,5 +23,5 @@ func main() {
 	fmt.Printf("%#v\n", authors)
 
 	// read a value from the map with a known key
-	fmt.Println(authors["tm"])
+	// fmt.Println(authors["tm"])
 }
